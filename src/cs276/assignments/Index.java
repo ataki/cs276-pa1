@@ -51,6 +51,10 @@ public class Index {
         long pos = fc.position();
         int termId = posting.getTermId();
 
+        /*
+            Since we use writePosting for writing intermediate results as well as final index,
+            use this boolean to signal when we're writing to final index
+         */
         if (isFinalIteration) {
             Pair<Long, Integer> pair;
             if (!postingDict.containsKey(termId)) {
@@ -62,6 +66,7 @@ public class Index {
             }
             postingDict.put(termId, pair);
         }
+
         index.writePosting(fc, posting);
     }
 
@@ -178,7 +183,7 @@ public class Index {
                 Collections.sort(docIdList);
 
                 PostingList plist = new PostingList(termId, docIdList);
-                writePosting(bfc.getChannel(), plist, (blockQueue.size() == 2));
+                writePosting(bfc.getChannel(), plist, false);
             }
 
             bfc.close();
@@ -215,13 +220,11 @@ public class Index {
                 It relies on the fact that both blockfiles are sorted by termId,
                 and the list of docIds in each posting list is sorted.
              */
-
             PostingList plist1 = index.readPosting(bf1.getChannel());
             PostingList plist2 = index.readPosting(bf2.getChannel());
             while((bf1.getFilePointer() != lenbf1) && (bf2.getFilePointer() != lenbf2)) {
                 int termId1 = plist1.getTermId();
                 int termId2 = plist2.getTermId();
-
                 if (termId1 == termId2) {
                     ArrayList<Integer> docIdList = new ArrayList<Integer>(plist1.getList());
                     docIdList.addAll(plist2.getList());
@@ -232,10 +235,10 @@ public class Index {
                     plist2 = index.readPosting(bf2.getChannel());
                 } else if (termId1 < termId2) {
                     writePosting(mf.getChannel(), plist1, isFinalIteration);
-                    plist1 = index.readPosting(bf1.getChannel());
+                    plist1 = index.readPosting(bf1.getChannel()); // advance fp
                 } else {
                     writePosting(mf.getChannel(), plist2, isFinalIteration);
-                    plist2 = index.readPosting(bf2.getChannel());
+                    plist2 = index.readPosting(bf2.getChannel()); // advance fp
                 }
             }
 

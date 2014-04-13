@@ -6,9 +6,13 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.security.KeyException;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.List;
 
 public class Query {
 
@@ -31,10 +35,10 @@ public class Query {
 	 * */
 	private static PostingList readPosting(FileChannel fc, int termId)
 			throws IOException {
-		/*
-		 * Your code here
-		 */
-		return null;
+        if (!posDict.containsKey(termId)) return null;
+        long pos = posDict.get(termId);
+        fc.position(pos);
+        return index.readPosting(fc);
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -102,9 +106,69 @@ public class Query {
 
 		/* For each query */
 		while ((line = br.readLine()) != null) {
-			/*
-			 * Your code here
-			 */
+            String tokens[] = line.trim().split("//s+");
+
+            /*
+                Maintain a final list of doc ids that represent the
+                intersection of all queries. For each token, intersect
+                its list with this "final list".
+            */
+
+            ArrayList<Integer> finalDocIdList = new ArrayList<Integer>();
+            boolean emptyResult = false;
+
+            for (String token: tokens) {
+                List<Integer> nextDocIdList;
+                if (termDict.containsKey(token)) {
+                    int tokenId = termDict.get(token);
+                    // TODO Catch KeyNotFoundException for tokenId
+                    indexFile.seek(0);
+                    PostingList pl = readPosting(indexFile.getChannel(), tokenId);
+                    // TODO Catch when pl == null (empty index)
+                    nextDocIdList = pl.getList();
+                } else {
+                    emptyResult = true;
+                    break;
+                }
+
+                /* Special case the first query since we're intersecting with nothing */
+                if (finalDocIdList.size() == 0) {
+                    finalDocIdList.addAll(nextDocIdList);
+                }
+
+                /* Our familiar  */
+                else {
+                    int idx1 = 0;
+                    int idx2 = 0;
+
+                    ArrayList<Integer> intersect = new ArrayList<Integer>();
+                    while ((idx1 != finalDocIdList.size()) && (idx2 != nextDocIdList.size())) {
+                        int docId1 = finalDocIdList.get(idx1);
+                        int docId2 = nextDocIdList.get(idx2);
+                        if (docId1 == docId2) {
+                            intersect.add(docId1);
+                            idx1++;
+                            idx2++;
+                        } else if (docId1 > docId2) {
+                            idx2++;
+                        } else {
+                            idx1++;
+                        }
+                    }
+                    finalDocIdList.clear();
+                    finalDocIdList.addAll(intersect);
+                }
+            }
+
+            /* Print Results */
+            if (emptyResult) {
+                System.out.println("no results found");
+            } else {
+                for (Integer docId : finalDocIdList) {
+                    String docName = docDict.get(docId);
+                    System.out.println(docName);
+                }
+            }
 		}
 		br.close();
 		indexFile.close();
