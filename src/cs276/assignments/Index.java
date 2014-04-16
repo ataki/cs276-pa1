@@ -166,6 +166,7 @@ public class Index {
             }
 
             /* Sort and output */
+            System.err.println("blockfile: " + blockFile.getName());
             if (!blockFile.createNewFile()) {
                 System.err.println("Create new block failure.");
                 return;

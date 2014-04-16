@@ -1,7 +1,6 @@
 package cs276.assignments;
 
-import java.io.BufferedReader;
-import java.io.File;
+import java.io.BufferedReader; import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -118,17 +117,24 @@ public class Query {
             boolean emptyResult = false;
 
             for (String token: tokens) {
-                List<Integer> nextDocIdList;
+                List<Integer> nextDocIdList = null;
                 if (termDict.containsKey(token)) {
                     int tokenId = termDict.get(token);
                     // TODO Catch KeyNotFoundException for tokenId
                     indexFile.seek(0);
                     PostingList pl = readPosting(indexFile.getChannel(), tokenId);
                     // TODO Catch when pl == null (empty index)
-                    nextDocIdList = pl.getList();
+                    if (pl != null) {
+                      nextDocIdList = pl.getList();
+                    }
                 } else {
                     emptyResult = true;
                     break;
+                }
+
+                /* If offset goes past file, then we have an error in recording */
+                if (nextDocIdList == null) {
+                    break;  
                 }
 
                 /* Special case the first query since we're intersecting with nothing */

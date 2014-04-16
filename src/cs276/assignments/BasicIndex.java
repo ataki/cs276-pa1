@@ -71,7 +71,7 @@ public class BasicIndex implements BaseIndex {
 
           ByteBuffer docBuf = ByteBuffer.allocate(4 * docList.size());
           for (Integer docId: docList) {
-            bb.putInt(docId);
+            docBuf.putInt(docId);
           }
           fc.write(docBuf);
         }
