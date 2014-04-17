@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.List;
+import java.util.TreeSet;
 
 public class Query {
 
@@ -34,7 +35,10 @@ public class Query {
 	 * */
 	private static PostingList readPosting(FileChannel fc, int termId)
 			throws IOException {
-        if (!posDict.containsKey(termId)) return null;
+        if (!posDict.containsKey(termId)) {
+        	return null;
+        }
+        
         long pos = posDict.get(termId);
         fc.position(pos);
         return index.readPosting(fc);
@@ -105,7 +109,7 @@ public class Query {
 
 		/* For each query */
 		while ((line = br.readLine()) != null) {
-            String tokens[] = line.trim().split("//s+");
+            String tokens[] = line.trim().split("\\s+");
 
             /*
                 Maintain a final list of doc ids that represent the
@@ -120,13 +124,11 @@ public class Query {
                 List<Integer> nextDocIdList = null;
                 if (termDict.containsKey(token)) {
                     int tokenId = termDict.get(token);
-                    // TODO Catch KeyNotFoundException for tokenId
                     indexFile.seek(0);
                     PostingList pl = readPosting(indexFile.getChannel(), tokenId);
-                    // TODO Catch when pl == null (empty index)
                     if (pl != null) {
                       nextDocIdList = pl.getList();
-                    }
+                    } 
                 } else {
                     emptyResult = true;
                     break;
@@ -170,7 +172,10 @@ public class Query {
             if (emptyResult) {
                 System.out.println("no results found");
             } else {
-                for (Integer docId : finalDocIdList) {
+            		// TODO Optimize out this O(N) operation that removes duplicates
+            		// from finalDocIdlist
+            		TreeSet<Integer> uniqueDocs = new TreeSet<Integer>(finalDocIdList);
+                for (Integer docId : uniqueDocs) {
                     String docName = docDict.get(docId);
                     System.out.println(docName);
                 }

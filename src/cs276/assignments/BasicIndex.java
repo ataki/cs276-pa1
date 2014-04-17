@@ -7,13 +7,6 @@ import java.util.ArrayList;
 import java.io.IOException;
 
 public class BasicIndex implements BaseIndex {
-    /*
-        BasicIndex stores PostingLists as a series of integers.
-        We track the length of each list globally via doc frequency
-        for each term. We track the offset into the Index record for
-        each term globally so that we can advance file pointers to
-        appropriate places before reading out the list.
-    */
 
     @Override
     public PostingList readPosting(FileChannel fc) {
@@ -30,7 +23,11 @@ public class BasicIndex implements BaseIndex {
           ByteBuffer bb = ByteBuffer.allocate(8);
 
           int bytesRead = fc.read(bb);
-          if (bytesRead == -1) return null;
+          if (bytesRead == -1) {
+            System.err.println("Basic: readPosting read fewer than 8 bytes from fc");
+            return null;
+          }
+          bb.rewind();
           int termId = bb.getInt();
           int docFreq = bb.getInt();
 
@@ -38,14 +35,20 @@ public class BasicIndex implements BaseIndex {
 
           ByteBuffer docBuffer = ByteBuffer.allocate(4 * docFreq);
           bytesRead = fc.read(docBuffer);
-          if (bytesRead == -1) return null;
+          if (bytesRead == -1) {
+            System.err.println("Basic: readPosting read fewer docIds than expected");
+            return null;
+          }
+          docBuffer.rewind();
           for (int i = 0; i < docFreq; i++) {
-            list.add(bb.getInt());
+            list.add(docBuffer.getInt());
           }
 
           return new PostingList(termId, list);
         }
         catch (IOException e) {
+          // TODO Remove before submitting
+          System.err.println("IOException in readPosting: " + e.toString());
           return null;
         }
     }
@@ -63,17 +66,21 @@ public class BasicIndex implements BaseIndex {
           int termId = p.getTermId();
           List<Integer> docList = p.getList();
 
-          ByteBuffer bb = ByteBuffer.allocate(8);
+          ByteBuffer bb = ByteBuffer.allocate(8 + 4 * docList.size());
+
           bb.putInt(termId);
           bb.putInt(docList.size());
 
-          fc.write(bb);
-
-          ByteBuffer docBuf = ByteBuffer.allocate(4 * docList.size());
           for (Integer docId: docList) {
-            docBuf.putInt(docId);
+            bb.putInt(docId);
           }
-          fc.write(docBuf);
+
+          bb.flip();
+
+          while (bb.hasRemaining()) {
+              int numWritten = fc.write(bb);
+          }
+
         }
         catch (IOException e) {}
     }

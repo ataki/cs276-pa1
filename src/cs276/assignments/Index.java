@@ -66,7 +66,6 @@ public class Index {
             }
             postingDict.put(termId, pair);
         }
-
         index.writePosting(fc, posting);
     }
 
@@ -153,7 +152,7 @@ public class Index {
 
                         ArrayList<Integer>curList;
                         if (!postingLists.containsKey(tokenId)) {
-                            curList = new ArrayList<Integer>(100);
+                            curList = new ArrayList<Integer>();
                             curList.add(docId);
                             postingLists.put(tokenId, curList);
                         } else {
@@ -166,7 +165,6 @@ public class Index {
             }
 
             /* Sort and output */
-            System.err.println("blockfile: " + blockFile.getName());
             if (!blockFile.createNewFile()) {
                 System.err.println("Create new block failure.");
                 return;
@@ -223,6 +221,7 @@ public class Index {
              */
             PostingList plist1 = index.readPosting(bf1.getChannel());
             PostingList plist2 = index.readPosting(bf2.getChannel());
+
             while((bf1.getFilePointer() != lenbf1) && (bf2.getFilePointer() != lenbf2)) {
                 int termId1 = plist1.getTermId();
                 int termId2 = plist2.getTermId();
