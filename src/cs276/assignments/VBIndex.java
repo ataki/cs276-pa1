@@ -19,7 +19,7 @@ public class VBIndex implements BaseIndex {
 	public PostingList readPosting(FileChannel fc) {
 		try {
 			/* read termId / doc frequency, and bytes needed to decode */
-			ByteBuffer bb = ByteBuffer.allocate(8);
+			ByteBuffer bb = ByteBuffer.allocate(12);
 
 			int bytesRead = fc.read(bb);
 			if (bytesRead == -1) {
