@@ -54,6 +54,7 @@ public class VBIndex implements BaseIndex {
 				decodeInteger(input, startIndex, numberEndIndex);
 				list[nWritten] = numberEndIndex[0];
 				startIndex = numberEndIndex[1];
+				nWritten++;
 				docFreq--;	
 			}
 
