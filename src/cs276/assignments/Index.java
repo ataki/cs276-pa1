@@ -157,7 +157,8 @@ public class Index {
                             postingLists.put(tokenId, curList);
                         } else {
                             curList = postingLists.get(tokenId);
-                            curList.add(docId);
+                            if (curList.get(curList.size() - 1) < docId)
+                                curList.add(docId);
                         }
                     }
                 }

@@ -8,113 +8,111 @@ import java.io.IOException;
 
 public class VBIndex implements BaseIndex {
 
-	/*
-			Encode gaps between postings in postings-lists. Our implementation
-			uses 4 extra bytes to encode the byte length of each posting list
-			to allow easy buffer reading.
-	*/
+    /*
+            Encode gaps between postings in postings-lists. Our implementation
+            uses 4 extra bytes to encode the byte length of each posting list
+            to allow easy buffer reading.
+    */
 
   public int INVALID_VBCODE = -1;
 
-	@Override
-	public PostingList readPosting(FileChannel fc) {
-		try {
-			/* read termId / doc frequency, and bytes needed to decode */
-			ByteBuffer bb = ByteBuffer.allocate(12);
+    @Override
+    public PostingList readPosting(FileChannel fc) {
 
-			int bytesRead = fc.read(bb);
-			if (bytesRead == -1) {
-				System.err.println("VB: readPosting read fewer than 8 bytes from fc");
-				return null;	
-			}
-			bb.rewind();
+        try {
+            /* read termId / doc frequency, and bytes needed to decode */
+            ByteBuffer bb = ByteBuffer.allocate(12);
 
-			int termId = bb.getInt();
-			int docFreq = bb.getInt();
-			int numBytes = bb.getInt(); 
+            int bytesRead = fc.read(bb);
+            if (bytesRead == -1) {
+                System.err.println("VB: readPosting read fewer than 8 bytes from fc");
+                return null;
+            }
+            bb.rewind();
 
-			// read postings list into fixed byte array 
-			ByteBuffer docBuf = ByteBuffer.allocate(numBytes);
-			bytesRead = fc.read(docBuf);
-			if (bytesRead == -1) {
-				System.err.println("VB: readPosting read fewer than 8 bytes from fc");
-				return null;
-			}
-			docBuf.rewind();
-			byte[] input = new byte[numBytes];
-			docBuf.get(input);
+            int termId = bb.getInt();
+            int docFreq = bb.getInt();
+            int numBytes = bb.getInt();
 
-			// translate postings list
-			int[] list = new int[numBytes];
+            // read postings list into fixed byte array
+            ByteBuffer docBuf = ByteBuffer.allocate(numBytes);
+            bytesRead = fc.read(docBuf);
+            if (bytesRead == -1) {
+                System.err.println("VB: readPosting read fewer than 8 bytes from fc");
+                return null;
+            }
+            docBuf.rewind();
+            byte[] input = new byte[numBytes];
+            docBuf.get(input);
 
-			// tuple of (decodedGap, index);
-			int[] numberEndIndex = new int[2];
-			int nWritten = 0;
-			int startIndex = 0;
-			while (docFreq != 0) {
-				decodeInteger(input, startIndex, numberEndIndex);
-				list[nWritten] = numberEndIndex[0];
-				startIndex = numberEndIndex[1];
-				nWritten++;
-				docFreq--;	
-			}
+            // translate postings list
+            int[] list = new int[numBytes];
 
-      GapDecode(list);
+            // tuple of (decodedGap, index);
+            int[] numberEndIndex = new int[2];
+            int nWritten = 0;
+            int startIndex = 0;
 
-			ArrayList<Integer> finalList = new ArrayList<Integer>(numBytes);
-			for (int i = 0; i < numBytes; i++) {
-				finalList.add(list[i]);	
-			}
+            for (int i = docFreq; i > 0; i--) {
+                decodeInteger(input, startIndex, numberEndIndex);
+                list[nWritten++] = numberEndIndex[0];
+                startIndex = numberEndIndex[1];
+            }
 
-			return new PostingList(termId, finalList);
+            GapDecode(list);
 
-		} catch (Exception e) {
-			System.err.println("VB ReadPosting Error: " + e.toString());
-			return null;	
-		}
-	}
+            ArrayList<Integer> finalList = new ArrayList<Integer>(numBytes);
+            for (int i = 0; i < numBytes; i++) {
+                finalList.add(list[i]);
+            }
+            return new PostingList(termId, finalList);
 
-	@Override
-	public void writePosting(FileChannel fc, PostingList p) {
-		try {
-			int termId = p.getTermId();
-      List<Integer> docList = p.getList();
-			int[] gapList = new int[docList.size()];
-
-      for (int i = 0; i < docList.size(); i++)
-        gapList[i] = docList.get(i);
-
-      GapEncode(gapList);
-
-			ByteBuffer bb = ByteBuffer.allocate(12);
-			byte[] gapOutput = new byte[4 * gapList.length];
-      int accumBytes = 0;
-      int startIndex = 0;
-
-			// VBEncode the postinglist
-      for (int aGapList : gapList) {
-      	accumBytes += encodeInteger(aGapList, gapOutput, startIndex);
-      	startIndex += (accumBytes + 1);
-      }
-
-      // Write buffers out  
-      bb.putInt(termId);
-      bb.putInt(gapList.length);
-      bb.putInt(accumBytes);
-			bb.flip();
-      fc.write(bb);
-
-      ByteBuffer gapBuf = ByteBuffer.wrap(gapOutput);
-      // set limit and pos to 0
-      gapBuf.flip();
-			while (gapBuf.hasRemaining()) {
-				int numWritten = fc.write(gapBuf);
-			}
-
-		} catch (IOException e) {
-      System.err.println("VB Error: " + e.toString());
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
-	}
+
+    @Override
+    public void writePosting(FileChannel fc, PostingList p) {
+        try {
+            int termId = p.getTermId();
+            List<Integer> docList = p.getList();
+            int[] gapList = new int[docList.size()];
+
+            for (int i = 0; i < docList.size(); i++)
+                gapList[i] = docList.get(i);
+
+            GapEncode(gapList);
+
+            ByteBuffer bb = ByteBuffer.allocate(12);
+            byte[] gapOutput = new byte[4 * gapList.length];
+            int accumBytes = 0;
+
+            // VBEncode the postinglist
+            for (int gap : gapList) {
+                accumBytes += encodeInteger(gap, gapOutput, accumBytes);
+            }
+
+            // Write buffers out
+            bb.putInt(termId);
+            bb.putInt(gapList.length);
+            bb.putInt(accumBytes);
+            bb.flip();
+            fc.write(bb);
+
+            ByteBuffer gapBuf = ByteBuffer.wrap(gapOutput);
+            gapBuf.limit(accumBytes);
+            gapBuf.position(0);
+            while (gapBuf.hasRemaining()) {
+                int numWritten = fc.write(gapBuf);
+            }
+        }
+        catch (IOException e) {
+            System.err.println("VB WritePosting Error: " + e.toString());
+        }
+    }
 
   private void GapEncode(int[] docIdList) {
     for (int i = docIdList.length - 1; i > 0; i--) {
@@ -128,8 +126,8 @@ public class VBIndex implements BaseIndex {
     }
   }
 
-	private int encodeInteger(int gap, byte[] outputVBCode, int startIndex) {
-		int numBytes = 0;
+    private int encodeInteger(int gap, byte[] outputVBCode, int startIndex) {
+        int numBytes = 0;
 
     // put lower order bytes in highest position in outputVBCode
     // the do-while is for the case where gap == 0
@@ -150,10 +148,11 @@ public class VBIndex implements BaseIndex {
       outputVBCode[startIndex + i] = outputVBCode[startIndex + numBytes-i-1];
       outputVBCode[startIndex + numBytes-i-1] = temp;
     }
-		return numBytes;
-	}
+        return numBytes;
+    }
 
-	private void decodeInteger(byte[] inputVBCode, int startIndex, int[] numberEndIndex) {
+    private void decodeInteger(byte[] inputVBCode, int startIndex, int[] numberEndIndex) {
+
     int output = 0;
     int lastIndex = startIndex;
 
@@ -175,5 +174,5 @@ public class VBIndex implements BaseIndex {
 
     numberEndIndex[0] = output;
     numberEndIndex[1] = lastIndex;
-	}
+    }
 }
