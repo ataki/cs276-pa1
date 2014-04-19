@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.io.IOException;
 
 public class VBIndex implements BaseIndex {
+
 	/*
 			Encode gaps between postings in postings-lists. Our implementation
 			uses 4 extra bytes to encode the byte length of each posting list
@@ -88,20 +89,24 @@ public class VBIndex implements BaseIndex {
 			ByteBuffer bb = ByteBuffer.allocate(12);
 			byte[] gapOutput = new byte[4 * gapList.length];
       int accumBytes = 0;
+      int startIndex = 0;
 
 			// VBEncode the postinglist
-      for (int aGapList : gapList)
-      	accumBytes += encodeInteger(aGapList, gapOutput);
+      for (int aGapList : gapList) {
+      	byte[] output = new byte[4];
+      	accumBytes += encodeInteger(aGapList, output, startIndex);
+      	startIndex += accumBytes;
+      }
 
       // Write buffers out  
       bb.putInt(termId);
       bb.putInt(gapList.length);
       bb.putInt(accumBytes);
 			bb.flip();
-
       fc.write(bb);
 
       ByteBuffer gapBuf = ByteBuffer.wrap(gapOutput);
+      // set limit and pos to 0
       gapBuf.flip();
 			while (gapBuf.hasRemaining()) {
 				int numWritten = fc.write(gapBuf);
@@ -124,7 +129,7 @@ public class VBIndex implements BaseIndex {
     }
   }
 
-	private int encodeInteger(int gap, byte[] outputVBCode) {
+	private int encodeInteger(int gap, byte[] outputVBCode, int startIndex) {
 		int numBytes = 0;
 
     // put lower order bytes in highest position in outputVBCode
@@ -135,16 +140,16 @@ public class VBIndex implements BaseIndex {
           b |= 0x80;
       }
       b |= (byte)(gap & 0x7f);
-      outputVBCode[numBytes] = b;
+      outputVBCode[startIndex + numBytes] = b;
       numBytes++;
       gap >>= 7;
     } while (gap > 0);
 
     // reverse lower order
     for (int i = 0; i < numBytes / 2; i++) {
-      byte temp = outputVBCode[i];
-      outputVBCode[i] = outputVBCode[numBytes-i-1];
-      outputVBCode[numBytes-i-1] = temp;
+      byte temp = outputVBCode[startIndex + i];
+      outputVBCode[startIndex + i] = outputVBCode[startIndex + numBytes-i-1];
+      outputVBCode[startIndex + numBytes-i-1] = temp;
     }
 		return numBytes;
 	}
