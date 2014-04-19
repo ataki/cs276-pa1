@@ -93,9 +93,8 @@ public class VBIndex implements BaseIndex {
 
 			// VBEncode the postinglist
       for (int aGapList : gapList) {
-      	byte[] output = new byte[4];
-      	accumBytes += encodeInteger(aGapList, output, startIndex);
-      	startIndex += accumBytes;
+      	accumBytes += encodeInteger(aGapList, gapOutput, startIndex);
+      	startIndex += (accumBytes + 1);
       }
 
       // Write buffers out  
