@@ -175,8 +175,11 @@ public class Query {
             		// TODO Optimize out this O(N) operation that removes duplicates
             		// from finalDocIdlist
             		TreeSet<Integer> uniqueDocs = new TreeSet<Integer>(finalDocIdList);
+                TreeSet<String> docNames = new TreeSet<String>();
                 for (Integer docId : uniqueDocs) {
-                    String docName = docDict.get(docId);
+                    docNames.add(docDict.get(docId));
+                }
+                for (String docName : docNames) {
                     System.out.println(docName);
                 }
             }
