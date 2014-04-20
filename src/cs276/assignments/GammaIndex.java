@@ -24,7 +24,6 @@ public class GammaIndex implements BaseIndex {
 
             int termId = bb.getInt();
             int docFreq = bb.getInt();
-            System.err.println("docFreq: " + docFreq);
             int numBytes = bb.getInt();
 
             // read postings list into fixed byte array
@@ -38,18 +37,6 @@ public class GammaIndex implements BaseIndex {
             byte[] input = new byte[numBytes];
             docBuf.get(input);
 
-            System.err.print("pre-decode: ");
-            for (int i = 0; i < input.length; i++) {
-                for (int j = 0; j < 8; j++) {
-                    Byte b = new Byte(input[i]);
-                    if ((b.intValue() & (1 << j)) != 0) {
-                        System.err.print("1");
-                    }
-                    else System.err.print("0");
-                }
-            }
-            System.err.println("");
-
             BitSet inputBitSet = convertToBitSet(input);
 
             // translate postings list
@@ -61,7 +48,6 @@ public class GammaIndex implements BaseIndex {
             int startIndex = 0;
 
             for (int i = docFreq; i > 0; i--) {
-                System.err.println("startIndex: "+ startIndex);
                 GammaDecodeInteger(inputBitSet, startIndex, numberEndIndex);
                 list[nWritten++] = numberEndIndex[0];
                 startIndex = numberEndIndex[1];
@@ -71,11 +57,8 @@ public class GammaIndex implements BaseIndex {
 
             ArrayList<Integer> finalList = new ArrayList<Integer>(numBytes);
             for (int i = 0; i < docFreq; i++) {
-                System.err.print(list[i] + " ");
                 finalList.add(list[i]);
             }
-            System.err.println("");
-            System.err.println("---------------------------------");
             return new PostingList(termId, finalList);
         } catch (Exception e) {
             e.printStackTrace();
@@ -86,7 +69,6 @@ public class GammaIndex implements BaseIndex {
     @Override
     public void writePosting(FileChannel fc, PostingList p) {
         try {
-            System.err.print("pre-encode: ");
             int termId = p.getTermId();
             List<Integer> docList = p.getList();
             int[] gapList = new int[docList.size()];
@@ -101,23 +83,28 @@ public class GammaIndex implements BaseIndex {
             gapOutput.set(0, false);
 
             int accumBits = 0;
+
             for (int gap : gapList) {
-                System.err.print(gap + " " );
+                accumBits = GammaEncodeInteger(gap, gapOutput, accumBits);
             }
-            System.err.println("");
-            for (int gap : gapList) {
-                accumBits += GammaEncodeInteger(gap, gapOutput, accumBits);
-            }
-            System.err.print("post-encode: ");
+            accumBits -= 1;
 
             byte[] gapOutputByteBuffer = gapOutput.toByteArray();
-//            System.err.print(gapOutput.toString());
-//            System.err.println("");
 
-            // special case if we're encoding 1 >> [0x0]
-            if (gapOutputByteBuffer.length == 0) {
-                gapOutputByteBuffer = new byte[1];
-                gapOutputByteBuffer[0] = 0;
+            // Handle special case when we're encoding a streak
+            // of 1's, e.g. [X, Y, 1, 1, 1, 1, ...]. These ones
+            // won't show up in the BitSet encoding as they're all
+            // set to 0
+            if (accumBits % 8 != 0) {
+                int numBytesTotal = (accumBits + 8 - 1) / 8;
+                int numBytesNeeded = numBytesTotal - gapOutputByteBuffer.length;
+                if (numBytesNeeded > 0) {
+                    byte[] temp = new byte[numBytesTotal];
+                    byte[] toConcat = new byte[numBytesNeeded];
+                    initializeToZeroes(toConcat);
+                    concatArrays(temp, gapOutputByteBuffer, toConcat);
+                    gapOutputByteBuffer = temp;
+                }
             }
 
             // in case of encoding 1, we have to manually set the all 0's buffer
@@ -136,17 +123,20 @@ public class GammaIndex implements BaseIndex {
             while (gapBuf.hasRemaining()) {
                 int numWritten = fc.write(gapBuf);
             }
-            for (int j = 0; j < 7; j++) {
-                if (gapOutput.get(j))
-                    System.err.print("1");
-                else
-                    System.err.print("0");
-            }
-            System.err.println("");
-            System.err.println("----------------------");
+
         } catch (IOException e) {
             System.err.println("Gamma WritePosting Error: " + e.toString());
         }
+    }
+
+    private void initializeToZeroes(byte[] arr) {
+        for (int i = 0; i < arr.length; i++) 
+            arr[i] = 0;
+    }
+
+    private void concatArrays(byte[] out, byte[] a, byte[] b) {
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
     }
 
     private void GapEncodeGamma(int[] docIdList) {
@@ -229,8 +219,6 @@ public class GammaIndex implements BaseIndex {
         int length = decodedIndex[0];
         int num = 0;
         int nextIndex = decodedIndex[1];
-        System.err.println("len: " + length);
-        System.err.println("nextIndex: " + decodedIndex[1]);
 
         // decode offset
         for (int i = 0; i < length; i++)
@@ -238,7 +226,6 @@ public class GammaIndex implements BaseIndex {
                 num |= (1 << (length - 1 - i));
         num |= (1 << length);
 
-        System.err.println("num: " + num);
         numberEndIndex[0] = num;
         numberEndIndex[1] = nextIndex + length;
     }
