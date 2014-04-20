@@ -61,6 +61,7 @@ public class GammaIndex implements BaseIndex {
             int startIndex = 0;
 
             for (int i = docFreq; i > 0; i--) {
+                System.err.println("startIndex: "+ startIndex);
                 GammaDecodeInteger(inputBitSet, startIndex, numberEndIndex);
                 list[nWritten++] = numberEndIndex[0];
                 startIndex = numberEndIndex[1];
@@ -69,14 +70,13 @@ public class GammaIndex implements BaseIndex {
             GapDecode(list);
 
             ArrayList<Integer> finalList = new ArrayList<Integer>(numBytes);
-            System.err.print("post-decode: ");
-            for (int i = 0; i < numBytes; i++) {
+            for (int i = 0; i < docFreq; i++) {
                 System.err.print(list[i] + " ");
                 finalList.add(list[i]);
             }
             System.err.println("");
+            System.err.println("---------------------------------");
             return new PostingList(termId, finalList);
-
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -229,6 +229,8 @@ public class GammaIndex implements BaseIndex {
         int length = decodedIndex[0];
         int num = 0;
         int nextIndex = decodedIndex[1];
+        System.err.println("len: " + length);
+        System.err.println("nextIndex: " + decodedIndex[1]);
 
         // decode offset
         for (int i = 0; i < length; i++)
@@ -236,8 +238,9 @@ public class GammaIndex implements BaseIndex {
                 num |= (1 << (length - 1 - i));
         num |= (1 << length);
 
+        System.err.println("num: " + num);
         numberEndIndex[0] = num;
-        numberEndIndex[1] = nextIndex + length + 1;
+        numberEndIndex[1] = nextIndex + length;
     }
 
 
