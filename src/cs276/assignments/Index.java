@@ -32,9 +32,9 @@ public class Index {
     // Total file counter
     private static int totalFileCount = 0;
     // Document counter
-    private static int docIdCounter = 0;
+    private static int docIdCounter = 1;
     // Term counter
-    private static int wordIdCounter = 0;
+    private static int wordIdCounter = 1;
     // Index
     private static BaseIndex index = null;
 
