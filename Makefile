@@ -8,3 +8,9 @@ build:
 test: 
 	@ant
 	@cd toy_example && rm -rf output/index && ./grader.sh
+
+extra: 
+	@echo "Building"
+	@ant
+	@echo "Running Gamma"
+	./run_dev.sh extra_credit
